@@ -1,0 +1,262 @@
+\documentclass[journal=jctcce,manuscript=article]{achemso}
+\usepackage[version=3]{mhchem} % Formula subscripts using \ce{}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{graphicx,subcaption}
+\usepackage{amssymb}
+\usepackage{braket}
+\usepackage{bm}
+\usepackage{derivative}
+\usepackage{hyperref}
+\usepackage{siunitx}
+\usepackage{booktabs}
+
+
+\author{William Colglazier}
+\affiliation{Theoretical Division, Los Alamos National Laboratory, Los Alamos, New Mexico 87545, 
+United States}
+\alsoaffiliation{Texas A$\&$M University, College Station, Texas 77840, United States}
+\email{wcolglazier@lanl.gov}
+
+
+\author{Maksim Kulichenko}
+\affiliation{Theoretical Division, Los Alamos National Laboratory, Los Alamos, New Mexico 87545, United States}
+\email{maxim@lanl.gov}
+
+
+\author{Nicholas Lubbers}
+\affiliation{Computer, Computational, and Statistical Sciences Division, Los Alamos National Laboratory, Los Alamos, New Mexico 87545, United States}
+
+\author{Anders M. N. Niklasson}
+\affiliation{Theoretical Division, Los Alamos National Laboratory, Los Alamos, New Mexico 87545, United States}
+
+\author{Sergei Tretiak}
+\affiliation{Theoretical Division, Los Alamos National Laboratory, Los Alamos, New Mexico 87545, United States}
+\alsoaffiliation{Center for Integrated Nanotechnologies, Los Alamos National Laboratory, Los Alamos, New Mexico 87545, United States}
+\alsoaffiliation{Center for Nonlinear Studies, Los Alamos National Laboratory, Los Alamos, New Mexico 87545, United States}
+
+
+\title{Multitask Machine Learning to More Accurately Learn Molecular Dipoles}
+
+% \abbreviations{IR,NMR,UV}
+% \keywords{American Chemical Society, \LaTeX}
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The "tocentry" environment can be used to create an entry for the
+%% graphical table of contents. It is given here as some journals
+%% require that it is printed as part of the abstract page. It will
+%% be automatically moved as appropriate.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{tocentry}
+
+Some journals require a graphical entry for the Table of Contents.
+This should be laid out ``print ready'' so that the sizing of the
+text is correct.
+
+Inside the \texttt{tocentry} environment, the font used is Helvetica
+8\,pt, as required by \emph{Journal of the American Chemical
+Society}.
+
+The surrounding frame is 9\,cm by 3.5\,cm, which is the maximum
+permitted for  \emph{Journal of the American Chemical Society}
+graphical table of content entries. The box will not resize if the
+content is too big: instead it will overflow the edge of the box.
+
+This box and the associated title will always be printed on a
+separate page at the end of the document.
+
+\end{tocentry}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The abstract environment will automatically gobble the contents
+%% if an abstract is not used by the target journal.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{abstract}
+We report a multitask machine learning method that trains in parallel to both atomic charge and quantum dipole to improve the accuracy of dipole magnitude predictions. Using Mulliken charges, which are the least computationally expensive to calculate using quantum mechanical approximations. During benchmarking, we found that in dipole training incorporating atomic charge as a small component of the loss function led to a thirty percent improvement in dipole prediction accuracy. Helping the machine learning model develop a more physical understanding of atomic structure by learning per atom qualities to more accurately predict global molecular properties.
+\end{abstract}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Start the main part of the manuscript here.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+Accurate modeling of quantum molecular properties such as energies, dipole moments, and atomic charges is a cornerstone of theoretical chemistry and physics. These properties are essential for understanding molecules and other systems of interest. When modeling molecular systems, a variety of approximate methods are available, each presenting a trade off between accuracy and computational cost. For example, Density Functional Theory (DFT) offers a relatively efficient approach, typically scaling with time complexity of $\mathcal{O}(n^3)$, while more accurate methods such as Coupled Cluster with Singles, Doubles, and perturbative Triples [CCSD(T)] scale at approximately $\mathcal{O}(n^7)$. When working with practical applications such as high throughput screening of large molecular datasets containing millions of molecules, the computational cost of traditional quantum chemistry methods becomes unrealistic and too time consuming. Alternatively, modern machine learning approaches can achieve comparable accuracy with significantly lower computational cost, typically scaling between $\mathcal{O}(n)$ and $\mathcal{O}(n^2)$. This efficiency enables the screening of large numbers of molecular systems to extract meaningful insights in a timeframe that is both realistic for scientific applications and not too expensive to calculate. In particular, accurately predicting the dipole magnitude at a low computational cost is critical for the study of molecular systems especially for applications in drug discovery, semiconductors and design of explosive materials. In this work, we present an improved method for dipole prediction by incorporating atomic Mulliken atomic charges the cheapest form of charge to calculate into the model training process. Using a multitask machine learning approach to more accurately predict dipole magnitudes by training dipoles and atomic charges in parallel. Including charge prediction during training helps the model develop more accurate atomic representations by capturing the physical relationship between charge distribution and molecular polarity. This approach outperforms models trained only on dipoles. Dipole values measure the spatial separation of positive and negative charges within a molecule. Including atomic charges in the model can enhance learning by providing a clear, localized view of how electrons are distributed. By learning to predict charges, the model better understands the physical origins of dipole moments, leading to more accurate and physically meaningful predictions that reflect both the results and their underlying causes.
+
+
+
+
+
+\section{Method}
+% \subsectionx{Theory}
+
+Dipoles are a feature of an individual molecule that measures how the electric charge is distributed between atoms across a molecule, resulting in one region having a partial positive charge and another a partial negative charge. This phenomenon typically arises when atoms with differing electronegativities form covalent bonds, leading to an unequal sharing of electrons. The resulting charge asymmetry can be quantified by the dipole magnitude. In contrast to dipoles, atomic charges are a per atom feature that occur when an atom has an uneven amount of negatively charged electrons than positively charged protons. These atomic charges can be used to help determine molecular dipoles. In this work, we use partial Mulliken charges just one of many ways to calculate atomic charges using a quantum mechanical method, denoted as \( q_A \).
+
+\[
+q_A = Z_A - \sum_{\mu \in A} P_{\mu\mu} - \sum_{\mu \in A} \sum_{\nu \notin A} P_{\mu\nu} S_{\mu\nu}
+\]
+
+There are many forms of charges that can be calculated for molecular systems, all with their own trade off of computational cost versus accuracy. We chose to work with Mulliken partial charges because they are the least computationally expensive method, though they are also known to be the least accurate. This inaccuracy becomes particularly evident when we calculate the dipole moment \( \mu \) using the point charge approximation:
+
+
+\[
+\boldsymbol{\mu} = \sum_i q_i \cdot \mathbf{r}_i
+\]
+
+Since this is a classical method using imprecise atomic charges, the resulting dipole magnitude this is a poor fit to the true value. As shown in Figure~\ref{fig:dipole_comparison}, the calculated dipole magnitudes based on Mulliken charges deviate significantly from reference dipoles computed using full quantum mechanical methods.
+
+\begin{figure}[hptb]
+    \centering
+    \includegraphics[scale=.5]{dipole_comparison.pdf}
+    \caption{Comparison of dipole magnitudes calculated using the point charge approximation with Mulliken charges versus dipoles computed from quantum mechanical methods. Each point represents a molecule. The red dashed line indicates the ideal match (\(y = x\)). The consistent underestimation and spread illustrate the limited accuracy of Mulliken charges in reproducing true dipole magnitudes.}
+    \label{fig:dipole_comparison}
+\end{figure}
+
+
+While quantum mechanical methods are more accurate, they are also computationally demanding, typically scaling between \( \mathcal{O}(n^3) \) and \( \mathcal{O}(n^7) \) with system size. This becomes impractical when studying large numbers of molecules or screening through extensive datasets. A deep learning model can be trained on a small, computationally expensive to compute dataset and then efficiently predict properties for similar molecular structures, reducing the computational cost to around \( \mathcal{O}(n) \) to \( \mathcal{O}(n^2) \). In this work, we use a hierarchical interacting message passing neural network, where features are updated through a sequence of layers called HIPPYNN(Hierarchically Interacting Particle PyTorch Neural Network). The first layer captures local information based on single atom specific interactions. The next layer models interactions between atoms by incorporating bond distances and information from the initial atom's neighborhood. The following layer captures interactions between neighborhoods, gathering information from the neighborhood of atoms bonded to the initial atom, all information is calculated within a fixed amount of space  which is defined through a cutoff radius denoted as \( R_{\text{cut}} \):
+
+\[
+r =
+\begin{cases}
+\left[ \cos\left( \frac{\pi}{2} \frac{r}{R_{\text{cut}}} \right) \right]^2, & r \leq R_{\text{cut}} \\
+0, & r > R_{\text{cut}}
+\end{cases}
+\]
+
+
+Figure~\ref{fig:Davidson_flowchart}.
+
+\begin{figure}[hptb]
+    \centering
+    \includegraphics[scale=.5]{3.pdf}
+    \caption{
+    Visualization of hierarchical feature extraction in the message passing neural network. In the first layer, atom specific features are extracted based on local atomic properties. The second layer incorporates pairwise interactions between neighboring atoms, capturing chemical bonding and short range dependencies. The third layer expands the receptive field further to include interactions between the neighborhoods of bonded atoms. This hierarchical design enables the model to integrate both local and extended molecular context, improving the prediction of global molecular properties.
+    }
+
+    \label{fig:Davidson_flowchart}
+\end{figure}
+
+The contributions from all the layers are summed together to form the final feature representation $\tilde{q}_i$, helping the model understand each atom’s local environment  and the overall structure of the molecule as a whole.
+
+\begin{equation}
+\tilde{q}_i = \sum_{a=1}^{N_{\text{features}}} \omega_a^n z_{i,a}^n + b^n
+\end{equation}
+
+
+
+
+
+This work is done with the QM9 dataset, which contains approximately 133,885 small organic molecules in their equilibrium geometries. These molecules, each with up to 9 heavy atoms including Hydrogen, Carbon, Nitrogen, Oxygen, and Fluorine were computed using DFT and include a wide range of quantum chemical properties.
+
+\[
+\mathcal{L}_{\text{dipole}} = \sqrt{ \frac{1}{M} \sum_{i=1}^{M} (\hat{\mu}_i - \mu_i)^2 } + \frac{1}{M} \sum_{i=1}^{M} |\hat{\mu}_i - \mu_i|
+\]
+
+\[
+\mathcal{L}_{\text{charge}} = \sqrt{ \frac{1}{N} \sum_{j=1}^{N} (\hat{q}_j - q_j)^2 } + \frac{1}{N} \sum_{j=1}^{N} |\hat{q}_j - q_j| + C
+\]
+
+During training, the model predicts atomic charges based on atomic numbers and positions, and predicts dipole magnitude using the charges and positions of individual atoms. The dataset is composed of equilibrium structures, so all charges in a molecule should sum to zero. A penalty term \( C \) is applied to the loss function to help correct this, denoted as:
+
+\[
+C = \frac{1}{N} \sum_{j=1}^{N} |\hat{q}_j|
+\]
+
+Training for both charge and dipole is performed in parallel via a composite loss function, with the charge loss given a smaller weight. Although its contribution is minor, the charge loss helps guide the model toward learning more physically consistent representations during training testing and validation.
+
+\[
+\mathcal{L}_{\text{total}} = \lambda_1 \cdot \mathcal{L}_{\text{charge}} + \lambda_2 \cdot \mathcal{L}_{\text{dipole}}
+\]
+
+
+% \newpage
+
+\section{Results}
+\subsection{Charge Accuracy}
+
+During training and validation, we observed significant improvements in accuracy by comparing true versus predicted values for both dipole and charge. We benchmarked two training strategies: one where the dipole contributed 100\% of the loss (with charge excluded), and another where the dipole contributed 96\% and charge contributed 4\%. Including a small but impactful charge loss component helps the model learn more localized features, which improves its ability to predict the global quantity of dipole magnitude. As expected, when training exclusively on dipoles, the model exhibits poor performance in predicting atomic charges. This is evident in Figure~\ref{fig:charge_only}, which shows a weak correlation between the true and predicted Mulliken charges. The mean absolute error (MAE) was 0.163, and the root mean square error (RMSE) was 0.254.
+
+\begin{figure}[hptb]
+    \centering
+    \includegraphics[scale=.5]{paper_charge_chargeonly.pdf}
+    \caption{
+        True vs. predicted Mulliken charges for the model trained using dipole loss only. The weak correlation and large spread indicate that the model is unable to infer accurate atomic charges without explicit supervision.
+    }
+    \label{fig:charge_only}
+\end{figure}
+
+Then, when assigning a small portion of the loss function to charge, we also observe as expected a significant improvement between the true and predicted Mulliken charge values. MAE was 0.036, and the RMSE was 0.061, showing a 78\% improvement in MAE and a 76\% improvement in RMSE.
+
+\begin{figure}[hptb]
+    \centering
+    \includegraphics[scale=.5]{paper-charge-dip.pdf}
+    \caption{
+        True vs. predicted Mulliken charges for the model trained using a combined loss function (96\% dipole, 4\% charge). The tight correlation and lower spread demonstrate the model's improved ability to learn charge information when explicitly guided by a charge loss term.
+    }
+    \label{fig:charge_combined}
+\end{figure}
+% \newpage
+
+\subsection{Dipole Accuracy}
+
+Training on dipoles alone yields a test loss of 0.023943 RMSE and 0.014272 MAE, demonstrating the model's strong baseline ability to predict molecular dipole moments. However, when atomic charge prediction is incorporated into the loss function with a small weight (4\% of the total loss), the model's dipole accuracy improves significantly. The RMSE is reduced to 0.018071 and the MAE to 0.009466, reflecting a 24.5\% and 33.7\% improvement, respectively. This shows that a small incorporation of charge significantly improves the model’s understanding of local electronic structure, which in turn benefits the prediction of global properties like dipole magnitude. Figure~\ref{fig:charge_combined} shows the true versus predicted dipole magnitudes for the two training strategies, clearly illustrating the tighter fit achieved when charges are included in training.
+
+\begin{figure}[hptb]
+    \centering
+    \includegraphics[scale=0.5]{dipole-paper.pdf}
+    \caption{
+        True vs. predicted dipole magnitudes for the model trained with a combined loss function: 96\% dipole and 4\% atomic charge. The tight correlation along the diagonal indicates high accuracy, demonstrating that incorporating a small charge supervision term significantly improves dipole prediction performance.
+    }
+
+
+    \label{fig:charge_combined}
+\end{figure}
+\newpage
+
+
+
+
+
+
+\newpage
+
+
+\section{Conclusion}
+
+In this work, we demonstrated a multitask machine learning approach that simultaneously learns atomic charges and molecular dipole moments to improve the prediction accuracy of dipole magnitudes. Using a hierarchical message passing neural network trained on the QM9 dataset, we showed that incorporating a small charge loss component just 4\% of the total loss significantly enhances dipole predictions compared to models trained solely on dipole data. Benchmarking showed that adding atomic charge supervision reduced the MAE by 33.7\% and the RMSE by 24.5\%.
+ This improvement highlights the value of training the model to capture localized, per atom features, which enrich the representation of molecular structure and lead to better generalization on global quantum properties. Our findings suggest that including physically motivated auxiliary tasks, such as charge prediction, can provide meaningful inductive bias in machine learning models for quantum chemistry. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The "Acknowledgement" section can be given in all manuscript
+%% classes.  This should be given within the "acknowledgement"
+%% environment, which will make the correct section or running title.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{acknowledgement}
+This work is supported by the U.S. Department of Energy, Office of Basic Energy Sciences (FWP LANLE8AN) and by the U.S. Department of Energy through the Los Alamos National Laboratory (LANL). LANL is operated by Triad National Security, LLC, for the National Nuclear Security Administration of the U.S. Department of Energy Contract No. 892333218NCA000001.
+\end{acknowledgement}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The same is true for Supporting Information, which should use the
+%% suppinfo environment.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{suppinfo}
+
+This will usually read something like: ``Experimental procedures and
+characterization data for all new compounds. The class will
+automatically add a sentence pointing to the information on line:
+
+\end{suppinfo}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The appropriate \bibliography command should be placed here.
+%% Notice that the class file automatically sets \bibliographystyle
+%% and also names the section correctly.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \bibliography{achemso-demo}
+\bibliography{references}
+
+
+\end{document}
+
+Reveiwers:
